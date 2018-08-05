@@ -100,6 +100,7 @@ window.AWP.CreateSite = function () {
 
         //Add users. TODO: Users will be passedin as an array.
         user = web.ensureUser('spFEPuser');
+		//user = web.ensureUser('spFEPuserXXX');
         var userCollection = newGroup.get_users();
         userCollection.addUser(user);
 
@@ -165,8 +166,8 @@ window.AWP.CreateSite = function () {
             )
             .then(function(msg){
             		return oncreateWebsiteSucceeded(webName);
-            	},
-                function(msg){
+            	}
+            ).catch(function(msg){
             		return oncreateWebsiteFailed(webName, msg);
             	}
             );
