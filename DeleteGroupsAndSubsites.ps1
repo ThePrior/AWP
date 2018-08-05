@@ -1,197 +1,54 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+# TODO: DO THIS BIT LAST AND USE SITE NAME TO COMPOSE GROUP NAME?
 
-<head>
+$spWeb = Get-SPWeb "http://internal.css.local/test/AWP"
+$spGroups = $spWeb.SiteGroups
 
-    <script src="http://internal.css.local/test/AWP/SiteAssets/scripts/jquery-3.1.1.min.js"></script>
+Write-Host "This site has" $spGroups.Count "groups"
 
-</head>
+$doNotDeleteGroupNames = ("Everyone", "AWP Members", "AWP Owners", "AWP Visitors")
 
-<body>
-    <div class="form-group required">
-        <label for="SiteNameLabel" class="col-sm-4 control-label">Site Name</label>
-        <div class="input-group">
-            <input type="text" id="SiteName" class="form-control" value="Test1" /></input>
-            <span class="input-group-btn">
-                <button id="CreateSiteBtn" class="btn btn-default" type="button">Create</button>
-            </span>
-        </div>
-    </div>
+$groups = $spGroups | ? {$_.Name -notin $doNotDeleteGroupNames}
+Write-Host "Found" $groups.Count "groups which will be deleted:"
 
-</body>
+ForEach($group in $groups) {
+   Write-Host "Deleting" $group.Name "..."
+   $spGroups.Remove($group.Name) 
+}
 
-<script>
+$spWeb.Dispose()
 
-window.AWP = window.AWP || {};
-window.AWP.CreateSite = function () {
-    var context,
-        web;
+###################################################################
+#
+# Delete subsites of given site
+#
+###################################################################
 
-    var createWeb = function (webName, webTitle, webdesc, template, inheritPermissions) {
+#Site URL
+$ParentWebURL="http://internal.css.local/test/AWP"
 
-        console.log("in createWeb");
-
-        var parentWeb = context.get_web(),
-            collWeb = parentWeb.get_webs(),
-            webCreationInfo = new SP.WebCreationInformation();
-
-        var deferred = $.Deferred();
-
-        webCreationInfo.set_title(webTitle);
-        webCreationInfo.set_url(webName);
-        webCreationInfo.set_description(webdesc);
-        webCreationInfo.set_webTemplate(template);
-        webCreationInfo.set_useSamePermissionsAsParentSite(inheritPermissions);
-
-        web = collWeb.add(webCreationInfo);
-
-        parentWeb.update();
-
-        context.executeQueryAsync(
-            function () {
-                deferred.resolve();
-            },
-            function (sender, args) {
-                deferred.reject(args.get_message());
-            }
-        );
-
-        return deferred.promise();
-    },
-
-    assocGroup = function (group, assocFn) {
-        console.log("in assocGroup: assocFn = " + assocFn);
-
-        var deferred = $.Deferred();
-
-        web[assocFn](group);
-        web.update();
-        context.executeQueryAsync(
-            function () {
-                deferred.resolve();
-            },
-            function (sender, args) {
-                deferred.reject(args.get_message());
-            }
-        );
-
-        return deferred.promise();
-    },
-
-    createGroup = function (webName, groupTitle, groupDescription, SPRoleType) {
-
-        console.log("in createGroup: webName = " + webName + ", groupTitle = " + groupTitle);
-
-        var groupCreationInfo = new SP.GroupCreationInformation(),
-            collRoleDefinitionBinding,
-            oRoleDefinition,collRollAssignment;
-
-        var deferred = $.Deferred();
-
-        groupCreationInfo.set_title(webName + " " + groupTitle);
-        groupCreationInfo.set_description(groupDescription);
-        newGroup = web.get_siteGroups().add(groupCreationInfo);
-
-        collRoleDefinitionBinding = SP.RoleDefinitionBindingCollection.newObject(context);
-        oRoleDefinition = web.get_roleDefinitions().getByType(SPRoleType);
-        collRoleDefinitionBinding.add(oRoleDefinition);
-        collRollAssignment = web.get_roleAssignments();
-        collRollAssignment.add(newGroup, collRoleDefinitionBinding);
-
-        //Add users. TODO: Users will be passedin as an array.
-        user = web.ensureUser('spFEPuser');
-        var userCollection = newGroup.get_users();
-        userCollection.addUser(user);
-
-        context.load(user);
-        context.load(newGroup);
-        context.load(oRoleDefinition, 'Name'); // TODO - CHECK THIS OUT!!
-
-        context.executeQueryAsync(
-            function () {
-                deferred.resolve(newGroup);
-            },
-            function (sender, args) {
-                deferred.reject(args.get_message());
-            }
-        );
-
-        return deferred.promise();
-    },
-
-
-    oncreateWebsiteSucceeded = function (webName) {
-        alert("Created Web site: " + webName);
-    },
-
-    oncreateWebsiteFailed = function (webName, msg) {
-        alert('Fail. ' + webName + " --- " + msg);
-    },
-
-    logError = function(error) {
-        console.log('An error occured: ' + error);
+#Custom Function to Delete subsite recursively
+function Remove-SPWebRecursively([Microsoft.SharePoint.SPWeb] $web, [bool]$IncludeStartWeb)
+{
+    $ChildWebsColl = $web.webs
+    
+    foreach($ChildWeb in $ChildWebsColl)
+    {
+        #Call the function recursively
+        Remove-SPWebRecursively $ChildWeb $true
+		$ChildWeb.Dispose()
     }
+    
+    #Remove the web  
+	if ($IncludeStartWeb)
+	{
+		Write-host "Removing Web $($web.Url)..."
+		Remove-SPWeb $web -Confirm:$true
+	}
+}
 
-    return {
+$ParentWeb = Get-SPWeb $ParentWebURL
 
-        execute: function(webName, webTitle, webdesc, template, inheritPermissions) {
+#Call the function to remove subsite
+Remove-SPWebRecursively $ParentWeb $false
 
-            context = new SP.ClientContext.get_current();
-
-            createWeb(webName, webTitle, webdesc, template, inheritPermissions)
-            .then(function(){
-                return createGroup(webName, "Visitors", "Visitors Group", SP.RoleType.reader)
-                    .then(function (group) {
-                            return assocGroup(group, "set_associatedVisitorGroup");
-                        }
-                    );
-            	}
-            )
-            .then(function(){
-                return createGroup(webName, "Members", "Members Group", SP.RoleType.editor)
-                    .then(function (group) {
-                            return assocGroup(group, "set_associatedMemberGroup");
-                        }
-                    );
-            	}
-            )
-            .then(function(){
-                return createGroup(webName, "Owners", "Owners Group", SP.RoleType.administrator)
-                    .then(function (group) {
-                            return assocGroup(group, "set_associatedOwnerGroup");
-                        }
-                    );
-            	}
-            )
-            .then(function(msg){
-            		return oncreateWebsiteSucceeded(webName);
-            	},
-                function(msg){
-            		return oncreateWebsiteFailed(webName, msg);
-            	}
-            );
-        }
-    };
-
-} ();
-
-	$(document).ready(function(){
-
-		$("#CreateSiteBtn").click(function() {
-
-			var siteName = $("#SiteName").val(),
-                webName = siteName,
-                webTitle = siteName,
-                webdesc = "My site description",
-                inheritPermissions = false,
-                template ='STS#0';
-
-                window.AWP.CreateSite.execute(webName, webTitle, webdesc, template, inheritPermissions);
-
-		});
-	});
-
-
-</script>
-
-</html>
+#https://duongtuanan.wordpress.com/2015/09/24/how-to-delete-subsites-in-sharepoint-using-powershell/
