@@ -181,7 +181,7 @@ window.AWP.CreateMeetingSites = function () {
 		console.log("in getNewMeetingSitesOnSuccess: itemCount = " + itemCount);
     },
 
-    doCreateAllSites = function(inheritParentPermissions, templateGuidName) {
+    doCreateAllSites = function(inheritPermissions, templateGuidName) {
 
 		meetingSites.forEach(function (site){
 			//console.log(JSON.stringify(site));
@@ -205,27 +205,60 @@ window.AWP.CreateMeetingSites = function () {
 
 	        // add to the $.Deferred chain with $.then() and re-assign
 	        dfd = dfd.then(function () {
+	        	var webName = site.committeeName;
+	        	var webDesc = "my desc";
+	        	
 			    waitModal = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, 
 								    dialogMessage + "'" + site.siteTitle + "'", dialogHeight, dialogWidth);
 
 		    	console.log(JSON.stringify(site));
-
-	            return createSubSiteAsync(site.committeeName, site.siteTitle, inheritParentPermissions, templateGuidName)
-	            		//.then(function () { waitModal.close(); }, function (msg) { waitModal.close(); AWP.JsomUtils.logErrorToUser(msg); });
-	            		.then(function () { 
-	                			oncreateWebsiteSucceeded(waitModal, false)
-	                		}, 
-	                		function (msg) {
-	                			oncreateWebsiteFailed(waitModal, msg)
-	                		}
-	                	);
-
-		        }); 
+		    	
+		    	return createWebAndDefaultGroups(webName, site.siteTitle, webDesc, templateGuidName, inheritPermissions);
+		    }); 
 	        	        
-			});
+		});
 		
 		return dfd.promise();
+	},
+	
+	createWebAndDefaultGroups = function(webName, siteTitle, webDesc, templateGuidName, inheritPermissions){
+			    	
+	            return createWeb(webName, siteTitle, webDesc, templateGuidName, inheritPermissions)
+	            .then(function(){
+	                return createGroup(webName, "Visitors", "Visitors Group", SP.RoleType.reader)
+	                    .then(function (group) {
+	                            return assocGroup(group, "set_associatedVisitorGroup");
+	                        }
+	                    );
+	            	}
+	            )
+	            .then(function(){
+	                return createGroup(webName, "Members", "Members Group", SP.RoleType.editor)
+	                    .then(function (group) {
+	                            return assocGroup(group, "set_associatedMemberGroup");
+	                        }
+	                    );
+	            	}
+	            )
+	            .then(function(){
+	                return createGroup(webName, "Owners", "Owners Group", SP.RoleType.administrator)
+	                    .then(function (group) {
+	                            return assocGroup(group, "set_associatedOwnerGroup");
+	                        }
+	                    );
+	            	}
+	            )
+	            .then(function(msg){
+	            		return oncreateWebsiteSucceeded(webName, false);
+	            	}
+	            ).catch(function(msg){
+	            		return oncreateWebsiteFailed(webName, msg);
+	            	}
+	            );
+
 	};
+
+	
 
 	/****************************************************************/
 	/* Exported functions											*/
@@ -242,12 +275,6 @@ window.AWP.CreateMeetingSites = function () {
 				return doCreateAllSites(inheritParentPermissions, templateGuidName);
 			});
 
-/*
-			).catch(function () {	
-				AWP.JsomUtils.handleErrorToUser(sender, args);
-			})
-*/
-
     	},
  		
         createSingleSite : function(webName, webTitle, webdesc, templateName, inheritPermissions) {
@@ -259,39 +286,8 @@ window.AWP.CreateMeetingSites = function () {
 			    waitModal = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, 
 				    dialogMessage + "'" + webTitle + "'", dialogHeight, dialogWidth);
 
-	            return createWeb(webName, webTitle, webdesc, templateGuidName, inheritPermissions)
-	            .then(function(){
-	                return createGroup(webName, "Visitors", "Visitors Group", SP.RoleType.reader)
-	                    .then(function (group) {
-	                            return assocGroup(group, "set_associatedVisitorGroup");
-	                        }
-	                    );
-	            	}
-	            );
-	        })
-            .then(function(){
-                return createGroup(webName, "Members", "Members Group", SP.RoleType.editor)
-                    .then(function (group) {
-                            return assocGroup(group, "set_associatedMemberGroup");
-                        }
-                    );
-            	}
-            )
-            .then(function(){
-                return createGroup(webName, "Owners", "Owners Group", SP.RoleType.administrator)
-                    .then(function (group) {
-                            return assocGroup(group, "set_associatedOwnerGroup");
-                        }
-                    );
-            	}
-            )
-            .then(function(msg){
-            		return oncreateWebsiteSucceeded(webName, true);
-            	}
-            ).catch(function(msg){
-            		return oncreateWebsiteFailed(webName, msg);
-            	}
-            );
+	            return createWebAndDefaultGroups(webName, webTitle, "my desc", templateGuidName, inheritPermissions);
+	        });
         }
 
 		/****************************************************************/
