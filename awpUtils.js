@@ -124,7 +124,7 @@ window.AWP.CreateMeetingSites = function () {
 		}
     },
 
-    oncreateWebsiteFailed = function (webName, msg) {
+    oncreateWebsiteFailed = function (msg) {
         if (waitModal) {
             waitModal.close();
         }
@@ -182,37 +182,37 @@ window.AWP.CreateMeetingSites = function () {
 		console.log("in getNewMeetingSitesOnSuccess: itemCount = " + itemCount);
     },
 
-    doCreateAllSites = function(inheritPermissions, templateGuidName) {
+    doCreateAllSites = function(inheritPermissions, templateGuidName) {	
 
-		meetingSites.forEach(function (site){
-			//console.log(JSON.stringify(site));
-		});
-		
-
-	    //Need async 'waterfall loop' to submit print requests for all forms for each patient, one patient at a time.
-	    //See: http://stackoverflow.com/questions/15504921/asynchronous-loop-of-jquery-deferreds-promises
-	
-		
 		waitModal = null;						
 		
 	    //begin the chain by resolving a new $.Deferred
 	    var dfd = $.Deferred().resolve();
+	    
+	    if (meetingSites.length === 0){
+	    	dfd = dfd.then(function () {
+				return AWP.JsomUtils.logMessageToUser("No sites found in 'MeetingSites' list with status 'New'");
+			});					
+		} else {	
+		    //Need async 'waterfall loop' to create webs, one site at a time.
+		    //See: http://stackoverflow.com/questions/15504921/asynchronous-loop-of-jquery-deferreds-promises
 		
-	   // use a forEach to create a closure freezing each site
-	    meetingSites.forEach(function (site) {
-
-	        // add to the $.Deferred chain with $.then() and re-assign
-	        dfd = dfd.then(function () {
-	        	
-			    waitModal = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, 
-								    dialogMessage + "'" + site.siteTitle + "'", dialogHeight, dialogWidth);
-
-		    	console.log(JSON.stringify(site));    	
-		    	
-	    		return createWebFromMeetingSite (site, templateGuidName, inheritPermissions);
-		    }); 
-	        	        
-		});
+		   // use a forEach to create a closure freezing each site
+		    meetingSites.forEach(function (site) {
+	
+		        // add to the $.Deferred chain with $.then() and re-assign
+		        dfd = dfd.then(function () {
+		        	
+				    waitModal = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, 
+									    dialogMessage + "'" + site.siteTitle + "'", dialogHeight, dialogWidth);
+	
+			    	console.log(JSON.stringify(site));    	
+			    	
+		    		return createWebFromMeetingSite (site, templateGuidName, inheritPermissions);
+			    }); 
+		        	        
+			});
+		}
 		
 		return dfd.promise();
 	},
@@ -273,7 +273,7 @@ window.AWP.CreateMeetingSites = function () {
 						setProperties["ErrorMessage"] = msg;
 
 						return updateMeetingSiteProperties(webName, setProperties)
-						.then(oncreateWebsiteFailed(webName, msg));
+						.then(oncreateWebsiteFailed(msg));
 	            	}
 	            );
 	},
