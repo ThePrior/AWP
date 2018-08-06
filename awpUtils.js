@@ -5,7 +5,6 @@ window.AWP.CreateMeetingSites = function () {
     	//onFail = AWP.JsomUtils.logErrorToUser,
     	meetingSites,
 	    webUrl, 
-	    webName,
 		newWeb,
 	    newGroup,
         dialog,
@@ -29,7 +28,7 @@ window.AWP.CreateMeetingSites = function () {
 		},
 		
 		createMembers = function () {
-			//Note: Members froup has permission changed from usual contributor to reader
+			//Note: Members group has permission changed from usual contributor to reader
 		    createGroup(
 		        "Members", "Members Group",
 		        SP.RoleType.reader, "set_associatedMemberGroup",
@@ -47,13 +46,13 @@ window.AWP.CreateMeetingSites = function () {
 		
 		createGroup = function (title, description, SPRoleType, assocFn, callbackOk, callbackFail) {
 		
-			console.log("in createGroup : title= " + title);
+			console.log("in createGroup : title= " + webUrl + " " + title);
 
 		    var groupCreationInfo = new SP.GroupCreationInformation(),
 		        collRoleDefinitionBinding,
 		        oRoleDefinition,collRollAssignment;
 
-		    groupCreationInfo.set_title(webName + " " + title);
+		    groupCreationInfo.set_title(webUrl + " " + title);
 		    groupCreationInfo.set_description(description);
 		    newGroup = newWeb.get_siteGroups().add(groupCreationInfo);
 		    collRoleDefinitionBinding = SP.RoleDefinitionBindingCollection.newObject(context);
@@ -122,14 +121,13 @@ window.AWP.CreateMeetingSites = function () {
 	    	console.log("in createSubSite: siteUrl = " + siteUrl);
 	    	
 	    	webUrl = siteUrl;
-	    	webName = siteTitle;
 	    	
 		    parentWeb = context.get_web(),
 		    webCreationInfo = new SP.WebCreationInformation();
 	
 	        webCreationInfo = new SP.WebCreationInformation();
 	        webCreationInfo.set_url(webUrl);
-	        webCreationInfo.set_title(webName);
+	        webCreationInfo.set_title(siteTitle);
 	        webCreationInfo.set_description("my description");
 	        webCreationInfo.set_language(1033);            
 	        webCreationInfo.set_useSamePermissionsAsParentSite(inheritParentPermissions);
@@ -146,16 +144,16 @@ window.AWP.CreateMeetingSites = function () {
 	    	console.log("in createSubSite: siteUrl = " + siteUrl);
 	    	
 		    var onSuccess;
+		    var dfd = $.Deferred();;
 		    
 	    	webUrl = siteUrl;
-	    	webName = siteTitle;
 	    	
 		    parentWeb = context.get_web(),
 		    webCreationInfo = new SP.WebCreationInformation();
 	
 	        webCreationInfo = new SP.WebCreationInformation();
 	        webCreationInfo.set_url(webUrl);
-	        webCreationInfo.set_title(webName);
+	        webCreationInfo.set_title(siteTitle);
 	        webCreationInfo.set_description("my description");
 	        webCreationInfo.set_language(1033);            
 	        webCreationInfo.set_useSamePermissionsAsParentSite(inheritParentPermissions);
@@ -173,43 +171,17 @@ window.AWP.CreateMeetingSites = function () {
 	        }
 	        
 	        context.executeQueryAsync(onSuccess, oncreateWebsiteFailed);
-				
-		},
-    
-    	OLD_VERSION_WORKS_createSubSite = function(siteUrl, siteName, inheritParentPermissions, templateGuidName) {
-	    	console.log("in createSubSite: siteUrl = " + siteUrl);
-	    	
-		    var onSuccess;
-		    
-	    	webUrl = siteUrl;
-	    	webName = siteName;
-	    	
-		    parentWeb = context.get_web(),
-		    webCreationInfo = new SP.WebCreationInformation();
-	
-	        webCreationInfo = new SP.WebCreationInformation();
-	        webCreationInfo.set_title(webName);
-	        webCreationInfo.set_description("my description");
-	        webCreationInfo.set_language(1033);            
-	        webCreationInfo.set_url(webName);
-	        webCreationInfo.set_useSamePermissionsAsParentSite(inheritParentPermissions);
-	        webCreationInfo.set_webTemplate(templateGuidName);
-	
-	        newWeb = parentWeb.get_webs().add(webCreationInfo);
-			parentWeb.update();
-	       
-	        dialog = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, dialogMessage, dialogHeight, dialogWidth);
 	        
-	        if (inheritParentPermissions){
-	        	onSuccess = oncreateWebsiteSucceeded;
-	        }else{
-	        	onSuccess = createDefaultGroups;
-	        }
-	        
-	        context.executeQueryAsync(onSuccess, oncreateWebsiteFailed);
-				
+		    context.executeQueryAsync(function () {
+		        dfd.resolve();
+		    },
+		    function (sender, args) {
+		        dfd.reject(args.get_message());
+		    });
+
+			return dfd.promise();
 		},
-		
+    	
 		getNewMeetingSites = function(onSuccess, onFail) {
 	    	console.log("Finding all Meeting Sites with status New");
 	    	meetingSites = [];
@@ -325,7 +297,7 @@ window.AWP.CreateMeetingSites = function () {
     	},
 
 	    
-        createSite : function(siteName, siteTitle, inheritParentPermissions, templateName) {
+        OLD_createSite : function(siteName, siteTitle, inheritParentPermissions, templateName) {
         	console.log("in createSite: " + siteName + ", site title: " + siteTitle);
 	        context = new SP.ClientContext.get_current();
 
@@ -344,8 +316,42 @@ window.AWP.CreateMeetingSites = function () {
 	                	);
                 	}
                 ); 
-    		}
+    		},
+    		
+    	createSite : function(siteName, siteTitle, inheritParentPermissions, templateName) {
+        	console.log("in createSite: " + siteName + ", site title: " + siteTitle);
+	        context = new SP.ClientContext.get_current();
+
+        	AWP.JsomUtils.getTemplateName(templateName)
+        	.then(
+        		function(templateGuidName) {
+				    var waitModal = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, 
+									    dialogMessage + "'" + siteTitle + "'", dialogHeight, dialogWidth);
+                	return WORKS_createSubSite(siteName, siteTitle, inheritParentPermissions, templateGuidName)
+                		.then(function() {
+                			return createDefaultGroups();
+                		});
+                		/*** THIS needs re-adding once createDefaultGroups has been promisified
+	                	.then(function () { 
+	                			oncreateWebsiteSucceeded(waitModal, true)
+	                		}, 
+	                		function (msg) {
+	                			oncreateWebsiteFailed(waitModal, msg)
+	                		}
+	                	);
+	                	**/
+                	}
+                ); 
+    		},
+	
+    	
+		/****************************************************************/
+		/* END of Exported functions									*/
+		/****************************************************************/
+	
+    		
     	}
+    	
 }();
 
 
