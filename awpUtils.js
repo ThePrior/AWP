@@ -163,7 +163,7 @@ window.AWP.CreateMeetingSites = function () {
 	    	meetingSite.admins = [];
 	    	meetingSite.members = [];
 	    	meetingSite.visitors = [];
-	    	meetingSite.committeeName = item.get_item('Title');
+	    	meetingSite.siteName = item.get_item('Title');
 	    	meetingSite.siteTitle = item.get_item('SiteTitle');
 	    	
 	    	item.get_item('Admin').forEach(function (admin) {
@@ -218,10 +218,9 @@ window.AWP.CreateMeetingSites = function () {
 	},
 	
 	createWebFromMeetingSite = function(site, templateGuidName, inheritPermissions){
-    	var webName = site.committeeName;
     	var webDesc = "my desc";
 
-		return createWebAndDefaultGroups(site.committeeName, site.siteTitle, webDesc, templateGuidName, inheritPermissions, 
+		return createWebAndDefaultGroups(site.siteName, site.siteTitle, webDesc, templateGuidName, inheritPermissions, 
 												site.admins, site.members, site.visitors);
 	},
 	
@@ -261,15 +260,36 @@ window.AWP.CreateMeetingSites = function () {
 	            	}
 	            )
 	            .then(function(msg){
-	            		return oncreateWebsiteSucceeded(webName, false);
+    				    var setProperties = { };
+						setProperties["Status"] = "Created";
+						setProperties["ErrorMessage"] = "";
+
+						return updateMeetingSiteProperties(webName, setProperties)
+						.then(oncreateWebsiteSucceeded(webName, false));
 	            	}
 	            ).catch(function(msg){
-	            		return oncreateWebsiteFailed(webName, msg);
+    				    var setProperties = { };
+						setProperties["Status"] = "Failed";
+						setProperties["ErrorMessage"] = msg;
+
+						return updateMeetingSiteProperties(webName, setProperties)
+						.then(oncreateWebsiteFailed(webName, msg));
 	            	}
 	            );
+	},
+	
+	updateMeetingSiteProperties = function(siteName, properties){
+	        console.log("Updating " +  siteName + " properties " + JSON.stringify(properties));
+	        	    
+			var camlQuery = new SP.CamlQuery();
+		    camlQuery.set_viewXml("<View><Query><Where><Eq><FieldRef Name='Title' /><Value Type='Text'>" + siteName + "</Value></Eq></Where></Query></View>");
 
+		    var usefulData = {};
+		    var includeFields = "Include(Title)"; 
+		    
+			return AWP.JsomUtils.getListItemsByListTitleCamlQueryInclude("MeetingSites", camlQuery, properties, includeFields, usefulData)
+		    	.then(AWP.JsomUtils.updateListItems);
 	};
-
 	
 
 	/****************************************************************/
