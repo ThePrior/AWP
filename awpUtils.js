@@ -205,7 +205,7 @@ window.AWP.CreateMeetingSites = function () {
 		        dfd = dfd.then(function () {
 		        	
 				    waitModal = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, 
-									    dialogMessage + "'" + site.siteTitle + "'", dialogHeight, dialogWidth);
+									    dialogMessage + "<br/><br/>" + "'" + site.siteTitle + "'", dialogHeight, dialogWidth);
 	
 			    	console.log(JSON.stringify(site));    	
 			    	
@@ -317,9 +317,12 @@ window.AWP.CreateMeetingSites = function () {
 	        context = new SP.ClientContext.get_current();
 
 			getNewMeetingSites().then(function() {
-				return AWP.JsomUtils.getTemplateName(templateName);
+				return AWP.JsomUtils.getTemplateName(templateName, true);
 			}).then(function (templateGuidName) {
-				return doCreateAllSites(inheritParentPermissions, templateGuidName);
+				return doCreateAllSites(inheritParentPermissions, templateGuidName)
+				.then(function(){
+					AWP.JsomUtils.refreshPage();
+				});
 			});
 
     	},
@@ -328,14 +331,18 @@ window.AWP.CreateMeetingSites = function () {
         	console.log("in createSingleSite : " + webName+ ", site title: " + webTitle + ", templateName: " + templateName);
 	        context = new SP.ClientContext.get_current();
 
-			AWP.JsomUtils.getTemplateName(templateName)
+			AWP.JsomUtils.getTemplateName(templateName, true)
 			.then(function(templateGuidName){
 			    waitModal = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, 
-				    dialogMessage + "'" + webTitle + "'", dialogHeight, dialogWidth);
+				    dialogMessage + "<br/><br/>" + "'" + webTitle + "'", dialogHeight, dialogWidth);
 
 	            return createSingleWeb(webName, webTitle, webdesc, templateGuidName, inheritPermissions);
-	        });
+				})
+            .catch(function(msg){
+				AWP.JsomUtils.logErrorToUser(msg);
+			});
         }
+
 
 		/****************************************************************/
 		/* END of Exported functions									*/

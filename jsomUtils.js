@@ -55,8 +55,8 @@ window.AWP.JsomUtils = function () {
 		    return deferred.promise();
 		},
 
-        getTemplateName: function(templateName) {	
-        	console.log("in getTemplateNamegetTemplateName: template = " + templateName);
+        getTemplateName: function(templateName, matchOnStart) {	
+        	console.log("in getTemplateNamegetTemplateName: template = " + templateName + ", matchOnStart = " + matchOnStart);
 		    var dfd = new $.Deferred(); 
 			var context = new SP.ClientContext.get_current();
 		   	
@@ -72,7 +72,7 @@ window.AWP.JsomUtils = function () {
 		           	templates.get_data().forEach(function (template) {
 		           		templateTitle = template.get_title();
 		           		//console.log(templateTitle);
-		           		if (templateTitle === templateName){
+		           		if (templateTitle === templateName || templateTitle.startsWith(templateName)){
 		           			templateGuidName  = template.get_name();
 							console.log("Found!! -- " + template.get_title());
 						}
@@ -224,8 +224,10 @@ window.AWP.JsomUtils = function () {
 		    console.log('in logMessageToUser: ' + msg);
 		    alert(msg);
 		},
-
-
+		
+		refreshPage: function(){
+			RefreshPage(SP.UI.DialogResult.OK);
+		},
 		
 		getWebNameFromServerRelativeUrl: function(url){
 			var lastSlash = _spPageContextInfo.webServerRelativeUrl.lastIndexOf('/');
