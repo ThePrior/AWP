@@ -2,6 +2,7 @@ window.AWP = window.AWP || {};
 
 window.AWP.CreateMeetingSites = function () {
     var context,
+    	web,
     	waitModal,
     	//onFail = AWP.JsomUtils.logErrorToUser,
     	meetingSites,
@@ -120,7 +121,7 @@ window.AWP.CreateMeetingSites = function () {
         }
 
 		if (displayAlert){
-		    alert("Created Web site: " + webName);
+		    alert("Web site: " + "'" + webName + "'" + " successfully created");
 		}
     },
 
@@ -218,10 +219,10 @@ window.AWP.CreateMeetingSites = function () {
 	},
 	
 	createWebFromMeetingSite = function(site, templateGuidName, inheritPermissions){
-    	var webDesc = "my desc";
+    	var webDesc = "";
 
 		return createWebAndDefaultGroups(site.siteName, site.siteTitle, webDesc, templateGuidName, inheritPermissions, 
-												site.admins, site.members, site.visitors);
+												site.admins, site.members, site.visitors, false);
 	},
 	
 	createSingleWeb = function(webName, webTitle, webDesc, templateGuidName, inheritPermissions){
@@ -229,12 +230,16 @@ window.AWP.CreateMeetingSites = function () {
 			members = [],
 			visitors = [];
 		
-		return createWebAndDefaultGroups(webName, webTitle, webDesc, templateGuidName, inheritPermissions, admins, members, visitors);
+		return createWebAndDefaultGroups(webName, webTitle, webDesc, templateGuidName, inheritPermissions, admins, members, visitors, true);
 	},
 	
-	createWebAndDefaultGroups = function(webName, siteTitle, webDesc, templateGuidName, inheritPermissions, admins, members, visitors){
+	createWebAndDefaultGroups = function(webName, siteTitle, webDesc, templateGuidName, inheritPermissions, admins, members, visitors, displayAlert){
 			    	
 	            return createWeb(webName, siteTitle, webDesc, templateGuidName, inheritPermissions)
+	            .then(function(){
+	                return setMasterPages();
+	            	}
+	            )
 	            .then(function(){
 	                return createGroup(webName, "Visitors", "Visitors Group", SP.RoleType.reader, visitors)
 	                    .then(function (group) {
@@ -265,7 +270,7 @@ window.AWP.CreateMeetingSites = function () {
 						setProperties["ErrorMessage"] = "";
 
 						return updateMeetingSiteProperties(webName, setProperties)
-						.then(oncreateWebsiteSucceeded(webName, false));
+						.then(oncreateWebsiteSucceeded(webName, displayAlert));
 	            	}
 	            ).catch(function(msg){
     				    var setProperties = { };
@@ -277,6 +282,16 @@ window.AWP.CreateMeetingSites = function () {
 	            	}
 	            );
 	},
+	
+    setMasterPages = function() {
+		console.log("in setMasterPages");
+    	
+    	var masterUrl = _spPageContextInfo.siteServerRelativeUrl + "/_catalogs/masterpage/" + "oslo.master";
+    	var customMasterUrl = _spPageContextInfo.siteServerRelativeUrl + "/_catalogs/masterpage/" + "oslo - Meetings.master";
+
+		return AWP.JsomUtils.setMasterPages(web, masterUrl, customMasterUrl);
+    },
+
 	
 	updateMeetingSiteProperties = function(siteName, properties){
 	        console.log("Updating " +  siteName + " properties " + JSON.stringify(properties));
@@ -318,7 +333,7 @@ window.AWP.CreateMeetingSites = function () {
 			    waitModal = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, 
 				    dialogMessage + "'" + webTitle + "'", dialogHeight, dialogWidth);
 
-	            return createSingleWeb(webName, webTitle, "my desc", templateGuidName, inheritPermissions);
+	            return createSingleWeb(webName, webTitle, webdesc, templateGuidName, inheritPermissions);
 	        });
         }
 

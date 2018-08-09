@@ -1,0 +1,232 @@
+<!-- Reference jQuery at the Site Collection Level - Assets --> 
+<script type="text/javascript" src ="/sites/Meetings/SiteAssets/scripts/jquery-3.3.1.min.js"></script>
+
+<script type="text/javascript" src ="/sites/Meetings/SiteAssets/scripts/jsomUtils.js"></script>
+
+<div id="jsomProvisioningMessage"></div>
+
+<script type="text/javascript">
+
+'use strict';
+window.AWP = window.AWP || {};
+
+$(document).ready(function()  {
+	ExecuteOrDelayUntilScriptLoaded(AWP.JsomProvisioning.provisionSite, "sp.js");
+});
+
+/*********************************************************************************/
+// Site Provisioning Functions
+/*********************************************************************************/
+window.AWP.JsomProvisioning = function () {
+    var context,
+    	siteConfigurationComplete = false,
+    	siteConfigurationFailed = false,
+    	showProgress = false,
+        dialog,
+        dialogTitle = "Please wait",
+        dialogMessage = "We are getting your site ready..",
+        dialogHeight = 500,
+        dialogWidth = 500,
+
+	appendProgressMessage = function(msg){
+		console.log(msg);
+		if (showProgress){
+			$('#jsomProvisioningMessage').append('<br /><div>' + msg + '</div>');
+		}
+	},
+	
+    doProvisionSite = function() {
+		if (siteConfigurationComplete){
+        	//appendProgressMessage("Site Configuration already completed");
+			return;
+		}
+		
+		if (siteConfigurationFailed ){
+        	appendProgressMessage("Auto configuration of the site failed. Visit the 'Provision' list for details and to override this message.");
+			return;
+		}
+
+		
+		//Now we can do the work. Let's query each property and try to fulfill any steps.
+		console.log("Site configuration required...");
+		appendProgressMessage("Site configuration required...");
+		
+		dialog = SP.UI.ModalDialog.showWaitScreenWithNoClose(dialogTitle, dialogMessage, dialogHeight, dialogWidth);
+		
+		console.log(_spPageContextInfo.siteServerRelativeUrl);
+		
+		//AWP.JsomUtils.setCustomMasterPageUrl(_spPageContextInfo.webServerRelativeUrl, "oslo - Meetings.master");
+		
+		changeNewTaskListPermissions()
+		/*
+		.then(function() {
+			return setMasterPages();
+			})
+		*/
+		.then(function () {
+			updateProvisionProperty("SiteConfigurationComplete", "true", "Updating site configuration complete property...");
+			})
+		.then(handleSuccess, handleFailure);
+
+    },
+    
+    setMasterPages = function() {
+		console.log("in setMasterPages");
+    	appendProgressMessage("Setting master page");
+    	
+    	var masterUrl = _spPageContextInfo.siteServerRelativeUrl + "/_catalogs/masterpage/" + "oslo.master";
+    	var customMasterUrl = _spPageContextInfo.siteServerRelativeUrl + "/_catalogs/masterpage/" + "oslo - Meetings.master";
+
+		return AWP.JsomUtils.setMasterPages(null, masterUrl, customMasterUrl);
+    },
+    
+    readShowProgress = function(items) {
+    	console.log("Reading Show Progress flag from Provisioning list");
+		var camlQuery = new SP.CamlQuery();
+	    camlQuery.set_viewXml("<View><Query><Where><And><Eq><FieldRef Name='Title' /><Value Type='Text'>ShowProgress</Value></Eq><Eq><FieldRef Name='PropertyValue' /><Value Type='Text'>true</Value></Eq></And></Where></Query></View>");
+	    var fieldProperties = {};
+	    var usefulData = {};
+	    var includeFields = "Include(Title)";    
+		includeFields = null;    
+	    
+		return AWP.JsomUtils.getListItemsByListTitleCamlQueryInclude("Provisioning", camlQuery, fieldProperties, includeFields, usefulData)
+			.then(setShowProgressFlag);
+    }, 
+    
+    setShowProgressFlag = function(items) {
+		    var itemCount = 0;
+		    items.get_data().forEach(function (item) {
+		        itemCount++;
+		    });
+	
+	console.log("in setShowProgressFlag : itemCount = " + itemCount);
+
+		    if (itemCount === 0) {
+		        showProgress = false;
+		    } else {
+		    	showProgress = true;
+		    }
+    },
+    
+
+    checkSiteIsConfigured= function(items) {
+    	console.log("Reading site configuration status from Provisioning list");
+		var camlQuery = new SP.CamlQuery();
+	    camlQuery.set_viewXml("<View><Query><Where><And><Eq><FieldRef Name='Title' /><Value Type='Text'>SiteConfigurationComplete</Value></Eq><Eq><FieldRef Name='PropertyValue' /><Value Type='Text'>false</Value></Eq></And></Where></Query></View>");
+	    var fieldProperties = {};
+	    var usefulData = {};
+	    var includeFields = "Include(Title)";    
+		includeFields = null;    
+	    
+		return AWP.JsomUtils.getListItemsByListTitleCamlQueryInclude("Provisioning", camlQuery, fieldProperties, includeFields, usefulData)
+			.then(checkSiteStatus);
+    }, 
+
+    checkSiteStatus = function(items) {
+		    var itemCount = 0;
+		    items.get_data().forEach(function (item) {
+		        itemCount++;
+		    });
+	
+	console.log("in checkSiteStatus: itemCount = " + itemCount);
+
+		    if (itemCount === 0) {
+		        siteConfigurationComplete = true;
+		    } else {
+		    	siteConfigurationComplete = false;
+		    }
+    },
+
+    checkSiteConfigurationFailed = function(items) {
+    	console.log("Reading site configuration failure status from Provisioning list");
+		var camlQuery = new SP.CamlQuery();
+	    camlQuery.set_viewXml("<View><Query><Where><And><Eq><FieldRef Name='Title' /><Value Type='Text'>SiteConfigurationFailed</Value></Eq><Eq><FieldRef Name='PropertyValue' /><Value Type='Text'>false</Value></Eq></And></Where></Query></View>");
+	    var fieldProperties = {};
+	    var usefulData = {};
+	    var includeFields = "Include(Title)";    
+		includeFields = null;    
+	    
+		return AWP.JsomUtils.getListItemsByListTitleCamlQueryInclude("Provisioning", camlQuery, fieldProperties, includeFields, usefulData)
+			.then(checkSiteFailureStatus);
+    }, 
+
+    checkSiteFailureStatus = function(items) {
+		    var itemCount = 0;
+		    items.get_data().forEach(function (item) {
+		        itemCount++;
+		    });
+	
+	console.log("in checkSiteFailureStatus : itemCount = " + itemCount);
+
+		    if (itemCount === 0) {
+		        siteConfigurationFailed = true;
+		    } else {
+		    	siteConfigurationFailed = false;
+		    }
+    },
+
+    changeNewTaskListPermissions = function() {
+    	console.log("in changeNewTaskListPermissions: ");
+		
+		var listTitle = 'New Task';
+		var	webName = AWP.JsomUtils.getWebNameFromServerRelativeUrl(_spPageContextInfo.webServerRelativeUrl);
+
+		return AWP.JsomUtils.breakListPermissionsInheritance(listTitle, false, true)
+		.then(function () {
+			return AWP.JsomUtils.addGroupPermissionsToList(listTitle, webName + " Members", SP.RoleType.editor);
+			})
+		.then(function () {
+			return AWP.JsomUtils.addGroupPermissionsToList(listTitle, webName + " Visitors", SP.RoleType.reader);
+			})
+		.then(function () {
+			return updateProvisionProperty("NewTaskListPermissionsDone", "true", "Updating New Task List permissions...");
+			});
+	}, 
+	
+	updateProvisionProperty = function(propertyName, propertyValue, msg){
+	        console.log("Updating " +  propertyName + " to " + propertyValue);
+	        appendProgressMessage(msg);
+
+	        
+		    var setProperties = { };
+		    setProperties['PropertyValue'] = propertyValue;
+		    
+			var camlQuery = new SP.CamlQuery();
+		    camlQuery.set_viewXml("<View><Query><Where><Eq><FieldRef Name='Title' /><Value Type='Text'>" + propertyName + "</Value></Eq></Where></Query></View>");
+		    var fieldProperties = {};
+		    var usefulData = {};
+		    var includeFields = "Include(Title)"; 
+		    
+			return AWP.JsomUtils.getListItemsByListTitleCamlQueryInclude("Provisioning", camlQuery, setProperties , includeFields, usefulData)
+		    	.then(AWP.JsomUtils.updateListItems);
+	},
+	
+	handleSuccess = function(){
+		appendProgressMessage('Site configuration completed successfully.');
+		dialog.close();
+	},
+	
+	handleFailure= function(error){
+		appendProgressMessage(error); 
+		dialog.close();
+		updateProvisionProperty("SiteConfigurationFailed", "true", "Updating site configuration failed property to true.");
+	}
+
+
+    return {
+        
+        provisionSite: function() {
+            console.log("in provisionSite");
+            
+            readShowProgress()
+            .then(checkSiteIsConfigured)
+            .then(checkSiteConfigurationFailed)
+	        .done(doProvisionSite);
+   		},
+
+    }
+    
+}();
+
+
+</script>
