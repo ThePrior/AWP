@@ -67,8 +67,43 @@ window.AWP.CreateMeetingSites = function () {
 
         return deferred.promise();
     },
+    
+    setGroupOwnership = function(){
+        console.log("in setGroupOwnership");
+        
+        var deferred = $.Deferred();
 
-    createGroup = function (webName, groupTitle, groupDescription, SPRoleType, users) {
+    	var ownerGroup = web.get_associatedOwnerGroup();
+    	var visitorGroup = web.get_associatedVisitorGroup();
+    	var memberGroup = web.get_associatedMemberGroup();
+    	
+    	ownerGroup.set_owner(ownerGroup);
+    	visitorGroup.set_owner(ownerGroup);
+    	memberGroup.set_owner(ownerGroup);
+
+    	ownerGroup.update();
+    	visitorGroup.update();
+    	memberGroup.update();
+    	    	
+        context.load(ownerGroup);
+        context.load(visitorGroup);
+        context.load(memberGroup);
+
+        context.executeQueryAsync(
+            function () {
+                deferred.resolve();
+            },
+            function (sender, args) {
+                deferred.reject(args.get_message());
+            }
+        );
+
+        return deferred.promise();
+
+    }
+    
+
+    createGroup = function (webName, groupTitle, groupDescription, roleType, users) {
 
         console.log("in createGroup: webName = " + webName + ", groupTitle = " + groupTitle);
 
@@ -81,9 +116,18 @@ window.AWP.CreateMeetingSites = function () {
         groupCreationInfo.set_title(webName + " " + groupTitle);
         groupCreationInfo.set_description(groupDescription);
         newGroup = web.get_siteGroups().add(groupCreationInfo);
+        
 
+        newGroup.set_onlyAllowMembersViewMembership(false);
+        newGroup.update();
+        
+        /* Defaults work for these.
+        newGroup.set_allowMembersEditMembership(false);
+        newGroup.set_allowRequestToJoinLeave(false);
+		*/
+		
         collRoleDefinitionBinding = SP.RoleDefinitionBindingCollection.newObject(context);
-        oRoleDefinition = web.get_roleDefinitions().getByType(SPRoleType);
+        oRoleDefinition = web.get_roleDefinitions().getByType(roleType);
         collRoleDefinitionBinding.add(oRoleDefinition);
         collRollAssignment = web.get_roleAssignments();
         collRollAssignment.add(newGroup, collRoleDefinitionBinding);
@@ -234,53 +278,57 @@ window.AWP.CreateMeetingSites = function () {
 	},
 	
 	createWebAndDefaultGroups = function(webName, siteTitle, webDesc, templateGuidName, inheritPermissions, admins, members, visitors, displayAlert){
-			    	
-	            return createWeb(webName, siteTitle, webDesc, templateGuidName, inheritPermissions)
-	            .then(function(){
-	                return setMasterPages();
-	            	}
-	            )
-	            .then(function(){
-	                return createGroup(webName, "Visitors", "Visitors Group", SP.RoleType.reader, visitors)
-	                    .then(function (group) {
-	                            return assocGroup(group, "set_associatedVisitorGroup");
-	                        }
-	                    );
-	            	}
-	            )
-	            .then(function(){
-	                return createGroup(webName, "Members", "Members Group", SP.RoleType.editor, members)
-	                    .then(function (group) {
-	                            return assocGroup(group, "set_associatedMemberGroup");
-	                        }
-	                    );
-	            	}
-	            )
-	            .then(function(){
-	                return createGroup(webName, "Owners", "Owners Group", SP.RoleType.administrator, admins)
-	                    .then(function (group) {
-	                            return assocGroup(group, "set_associatedOwnerGroup");
-	                        }
-	                    );
-	            	}
-	            )
-	            .then(function(msg){
-    				    var setProperties = { };
-						setProperties["Status"] = "Created";
-						setProperties["ErrorMessage"] = "";
+				    	
+        return createWeb(webName, siteTitle, webDesc, templateGuidName, inheritPermissions)
+        .then(function(){
+            return setMasterPages();
+        	}
+        )
+        .then(function(){
+            return createGroup(webName, "Owners", "Owners Group", SP.RoleType.administrator, admins)
+                .then(function (group) {
+                        return assocGroup(group, "set_associatedOwnerGroup");
+                    }
+                );
+        	}
+        )
+        .then(function(){
+            return createGroup(webName, "Visitors", "Visitors Group", SP.RoleType.reader, visitors)
+                .then(function (group) {
+                        return assocGroup(group, "set_associatedVisitorGroup");
+                    }
+                );
+        	}
+        )
+        .then(function(){
+            return createGroup(webName, "Members", "Members Group", SP.RoleType.reader, members)
+                .then(function (group) {
+                        return assocGroup(group, "set_associatedMemberGroup");
+                    }
+                );
+        	}
+        )
+        .then(function(){
+        	return setGroupOwnership();
+        	}
+        )
+        .then(function(msg){
+			    var setProperties = { };
+				setProperties["Status"] = "Created";
+				setProperties["ErrorMessage"] = "";
 
-						return updateMeetingSiteProperties(webName, setProperties)
-						.then(oncreateWebsiteSucceeded(webName, displayAlert));
-	            	}
-	            ).catch(function(msg){
-    				    var setProperties = { };
-						setProperties["Status"] = "Failed";
-						setProperties["ErrorMessage"] = msg;
+				return updateMeetingSiteProperties(webName, setProperties)
+				.then(oncreateWebsiteSucceeded(webName, displayAlert));
+        	}
+        ).catch(function(msg){
+			    var setProperties = { };
+				setProperties["Status"] = "Failed";
+				setProperties["ErrorMessage"] = msg;
 
-						return updateMeetingSiteProperties(webName, setProperties)
-						.then(oncreateWebsiteFailed(msg));
-	            	}
-	            );
+				return updateMeetingSiteProperties(webName, setProperties)
+				.then(oncreateWebsiteFailed(msg));
+        	}
+        );
 	},
 	
     setMasterPages = function() {
