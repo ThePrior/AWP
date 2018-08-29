@@ -55,19 +55,11 @@ window.AWP.JsomProvisioning = function () {
 		
 		console.log(_spPageContextInfo.siteServerRelativeUrl);
 		
-		//AWP.JsomUtils.setCustomMasterPageUrl(_spPageContextInfo.webServerRelativeUrl, "oslo - Meetings.master");
-		
 		changeNewTaskListPermissions()
-		/* Now done when the site is created.
-		.then(function() {
-			return setMasterPages();
-			})
-		*/
 		.then(function () {
 			updateProvisionProperty("SiteConfigurationComplete", "true", "Updating site configuration complete property...");
 			})
 		.then(handleSuccess, handleFailure);
-
     },
     
     setMasterPages = function() {
@@ -176,7 +168,7 @@ window.AWP.JsomProvisioning = function () {
 			return AWP.JsomUtils.addGroupPermissionsToList(listTitle, webName + " Members", SP.RoleType.editor);
 			})
 		.then(function () {
-			return AWP.JsomUtils.addGroupPermissionsToList(listTitle, webName + " Visitors", SP.RoleType.reader);
+			return AWP.JsomUtils.addGroupPermissionsToList(listTitle, webName + " Owners", SP.RoleType.administrator);
 			})
 		.then(function () {
 			return updateProvisionProperty("NewTaskListPermissionsDone", "true", "Updating New Task List permissions...");
